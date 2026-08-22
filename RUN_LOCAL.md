@@ -1,92 +1,92 @@
-# RUN_LOCAL.md – Hướng dẫn chạy Lab 04
+# RUN_LOCAL.md – Hướng dẫn chạy Lab 04 (Analytics Service)
 
-Tài liệu này giúp người khác clone repo sạch và chạy lại service trong Docker.
-
----
-
-## 1. Clone repo
-
-```bash
-git clone <repo-url>
-cd FIT4110_lab04_docker_packaging
-```
+Tài liệu này hướng dẫn chạy service **Analytics Service** (`team-analytics`) trong Docker container và kiểm thử tự động với Newman.
 
 ---
 
-## 2. Cài dependencies cho Newman/Prism/Spectral
+## 1. Cài đặt dependencies kiểm thử (Newman / Spectral / Prism)
 
 ```bash
 npm install
 ```
 
----
-
-## 3. Build Docker image
-
+Kiểm tra OpenAPI contract:
 ```bash
-docker build -t fit4110/iot-ingestion:lab04 .
+npm run lint:openapi
 ```
 
 ---
 
-## 4. Run container
+## 2. Build Docker Image
 
 ```bash
-docker run --rm \
-  --name fit4110-iot-lab04 \
-  -p 8000:8000 \
-  --env-file .env.example \
-  fit4110/iot-ingestion:lab04
+docker build -t fit4110/analytics-service:lab04 .
 ```
 
-Mở terminal khác, kiểm tra:
+Gán tag image theo quy chuẩn bài lab:
+```bash
+docker tag fit4110/analytics-service:lab04 ghcr.io/quynhdinhtrong/team-analytics:v0.1.0-team-analytics
+```
+
+---
+
+## 3. Khởi chạy Docker Container
 
 ```bash
+docker run -d --name fit4110-analytics-lab04 -p 8000:8000 --env-file .env.example fit4110/analytics-service:lab04
+```
+
+Kiểm tra trạng thái container và healthcheck:
+```bash
+docker ps
 curl http://localhost:8000/health
 ```
 
 Kết quả mong đợi:
-
 ```json
 {
   "status": "ok",
-  "service": "iot-ingestion",
-  "version": "0.4.0"
+  "service": "analytics-service",
+  "version": "1.0.0"
 }
+```
+
+Kiểm tra non-root user bên trong container:
+```bash
+docker exec fit4110-analytics-lab04 whoami
+# Kết quả: appuser
 ```
 
 ---
 
-## 5. Chạy Newman test trên container
+## 4. Chạy bộ kiểm thử Newman trên Container
 
 ```bash
 npm run test:local
 ```
 
-Report sinh tại:
+Báo cáo kiểm thử tự động được xuất tại:
+- Báo cáo JUnit XML: `reports/newman-lab04-local.xml`
+- Báo cáo chi tiết HTML: `reports/newman-lab04-local.html`
 
-```text
-reports/newman-lab04-local.xml
-reports/newman-lab04-local.html
+---
+
+## 5. Dừng Container
+
+```bash
+docker stop fit4110-analytics-lab04
+docker rm fit4110-analytics-lab04
 ```
 
 ---
 
-## 6. Dừng container
+## 6. Lệnh nhanh (Quick Commands)
 
-Nếu không dùng `--rm` hoặc container còn chạy:
-
+Nếu sử dụng `make`:
 ```bash
-docker stop fit4110-iot-lab04
-```
-
----
-
-## 7. Lệnh nhanh
-
-```bash
-make build
-make run
-make test-docker
-make stop
+make build          # Build Docker image
+make run-detached   # Chạy container nền
+make health         # Kiểm tra /health
+make test-docker    # Chạy Newman tests trên container
+make stop           # Dừng container
 ```

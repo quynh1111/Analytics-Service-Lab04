@@ -1,0 +1,587 @@
+{
+  "info": {
+    "_postman_id": "fit4110-lab04-analytics-docker",
+    "name": "FIT4110 Lab04 Analytics Docker Verification",
+    "description": "Postman Collection kiểm thử đóng gói Docker và hợp đồng API cho Analytics Service (Lab 04).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const prefix = pm.environment.get('tracePrefix') || 'fit4110-lab04';",
+          "pm.variables.set('traceId', prefix + '-' + Date.now());",
+          "pm.request.headers.upsert({ key: 'X-Trace-Id', value: pm.variables.get('traceId') });"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "00_Health",
+      "item": [
+        {
+          "name": "GET /health - service is alive and healthy",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response has status ok', function () { const json = pm.response.json(); pm.expect(json.status).to.eql('ok'); });",
+                  "pm.test('Response identifies analytics service', function () { const json = pm.response.json(); pm.expect(json.service).to.eql('analytics-service'); pm.expect(json).to.have.property('version'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01_Functional",
+      "item": [
+        {
+          "name": "POST /api/v1/analytics/events/ingest - ingest telemetry event",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/analytics/events/ingest",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "analytics", "events", "ingest"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n  \"eventType\": \"telemetry.ingested\",\n  \"occurredAt\": \"2026-08-13T09:15:00Z\",\n  \"correlationId\": \"f1e2d3c4-b5a6-7890-abcd-ef1234567890\",\n  \"source\": \"iot-ingestion\",\n  \"data\": {\n    \"deviceId\": \"SENSOR-001\",\n    \"zoneId\": \"ROOM-101\",\n    \"metric\": \"temperature\",\n    \"value\": 29.5,\n    \"unit\": \"celsius\",\n    \"sampledAt\": \"2026-08-13T09:14:58Z\"\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201 Created or 200 OK', function () { pm.expect([200, 201]).to.include(pm.response.code); });",
+                  "pm.test('Response indicates processed event', function () { const json = pm.response.json(); pm.expect(json).to.have.property('eventId'); pm.expect(json.status).to.include('PROCESSED'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/v1/analytics/events/ingest - ingest access log event",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/analytics/events/ingest",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "analytics", "events", "ingest"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"770e8400-e29b-41d4-a716-446655440002\",\n  \"eventType\": \"access.log.created\",\n  \"occurredAt\": \"2026-08-13T09:25:30Z\",\n  \"correlationId\": \"9f666062-a41d-63f6-c938-668877662222\",\n  \"source\": \"access-gate\",\n  \"data\": {\n    \"gate_id\": \"GATE-01\",\n    \"direction\": \"IN\",\n    \"card_id_hash\": \"sha256:abc123456\",\n    \"user_type\": \"student\",\n    \"recorded_at\": \"2026-08-13T09:25:30Z\"\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201 or 200', function () { pm.expect([200, 201]).to.include(pm.response.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/analytics/daily-summary - get daily report",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/analytics/daily-summary?date=2026-08-13",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "analytics", "daily-summary"],
+              "query": [{ "key": "date", "value": "2026-08-13" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response matches DailySummaryReport schema', function () {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.have.property('date', '2026-08-13');",
+                  "  pm.expect(json).to.have.property('total_access');",
+                  "  pm.expect(json).to.have.property('total_alerts');",
+                  "  pm.expect(json.total_access).to.be.a('number');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/analytics/metrics/temperature - get temperature metrics",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/analytics/metrics/temperature?room_id=ROOM-101",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "analytics", "metrics", "temperature"],
+              "query": [{ "key": "room_id", "value": "ROOM-101" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is array of temperature metrics', function () {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.be.an('array');",
+                  "  pm.expect(json.length).to.be.greaterThan(0);",
+                  "  pm.expect(json[0]).to.have.property('room_id', 'ROOM-101');",
+                  "  pm.expect(json[0]).to.have.property('avg_temperature');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/analytics/metrics/access-stats - get access stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/analytics/metrics/access-stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "analytics", "metrics", "access-stats"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response is array of access stat metrics', function () {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.be.an('array');",
+                  "  pm.expect(json.length).to.be.greaterThan(0);",
+                  "  pm.expect(json[0]).to.have.property('time_bucket');",
+                  "  pm.expect(json[0]).to.have.property('entry_count');",
+                  "  pm.expect(json[0]).to.have.property('exit_count');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/analytics/metrics/events - get anomaly events",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/analytics/metrics/events?limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "analytics", "metrics", "events"],
+              "query": [{ "key": "limit", "value": "10" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Response contains anomaly events', function () {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.be.an('array');",
+                  "  if (json.length > 0) {",
+                  "    pm.expect(json[0]).to.have.property('event_id');",
+                  "    pm.expect(json[0]).to.have.property('event_type');",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02_Auth",
+      "item": [
+        {
+          "name": "GET /api/v1/analytics/daily-summary - valid token is accepted",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/analytics/daily-summary?date=2026-08-13",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "analytics", "daily-summary"],
+              "query": [{ "key": "date", "value": "2026-08-13" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Valid token request returns success 200', function () {",
+                  "  pm.expect(pm.response.code).to.eql(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/analytics/daily-summary - missing token is rejected on real service",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/analytics/daily-summary?date=2026-08-13",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "analytics", "daily-summary"],
+              "query": [{ "key": "date", "value": "2026-08-13" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const env = pm.environment.get('env') || 'mock';",
+                  "if (env === 'mock') {",
+                  "  pm.test('Skipped on mock', function () { pm.expect(true).to.eql(true); });",
+                  "} else {",
+                  "  pm.test('Missing token returns 401 or 403', function () {",
+                  "    pm.expect([401, 403]).to.include(pm.response.code);",
+                  "  });",
+                  "  pm.test('Response follows ProblemDetails', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('title');",
+                  "    pm.expect(json).to.have.property('status');",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/analytics/daily-summary - invalid token is rejected on real service",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer invalid-token-12345" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/analytics/daily-summary?date=2026-08-13",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "analytics", "daily-summary"],
+              "query": [{ "key": "date", "value": "2026-08-13" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const env = pm.environment.get('env') || 'mock';",
+                  "if (env === 'mock') {",
+                  "  pm.test('Skipped on mock', function () { pm.expect(true).to.eql(true); });",
+                  "} else {",
+                  "  pm.test('Invalid token returns 401 or 403', function () {",
+                  "    pm.expect([401, 403]).to.include(pm.response.code);",
+                  "  });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03_Negative",
+      "item": [
+        {
+          "name": "GET /api/v1/analytics/daily-summary - missing date param returns validation error",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Prefer", "value": "code=400" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/analytics/daily-summary",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "analytics", "daily-summary"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Missing query param returns client error', function () {",
+                  "  pm.expect([400, 422]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test('Error response follows ProblemDetails shape', function () {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.have.property('title');",
+                  "  pm.expect(json).to.have.property('status');",
+                  "  pm.expect(json.status).to.be.within(400, 599);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/analytics/daily-summary - invalid date format returns client error",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Prefer", "value": "code=400" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/analytics/daily-summary?date=invalid-date",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "analytics", "daily-summary"],
+              "query": [{ "key": "date", "value": "invalid-date" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Invalid date format returns 400 or 422', function () {",
+                  "  pm.expect([400, 422]).to.include(pm.response.code);",
+                  "});",
+                  "pm.test('Error response has detail explanation', function () {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.have.property('detail');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/analytics/metrics/temperature - invalid room_id format returns client error",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Prefer", "value": "code=400" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/analytics/metrics/temperature?room_id=INVALID@ROOM!#$",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "analytics", "metrics", "temperature"],
+              "query": [{ "key": "room_id", "value": "INVALID@ROOM!#$" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Invalid room_id regex returns 400 or 422', function () {",
+                  "  pm.expect([400, 422]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04_Boundary_Reliability",
+      "item": [
+        {
+          "name": "GET /api/v1/analytics/metrics/events - boundary limit 100 is accepted",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/analytics/metrics/events?limit=100",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "analytics", "metrics", "events"],
+              "query": [{ "key": "limit", "value": "100" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Boundary limit 100 returns 200 OK', function () {",
+                  "  pm.expect(pm.response.code).to.eql(200);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/v1/analytics/metrics/events - limit 101 above max is rejected",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Prefer", "value": "code=400" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/analytics/metrics/events?limit=101",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "analytics", "metrics", "events"],
+              "query": [{ "key": "limit", "value": "101" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Limit above max returns client error 400 or 422', function () {",
+                  "  pm.expect([400, 422]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/v1/analytics/events/ingest - duplicate eventId is handled idempotently",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/analytics/events/ingest",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "analytics", "events", "ingest"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"a1b2c3d4-e5f6-7890-abcd-ef1234567890\",\n  \"eventType\": \"telemetry.ingested\",\n  \"occurredAt\": \"2026-08-13T09:15:00Z\",\n  \"correlationId\": \"f1e2d3c4-b5a6-7890-abcd-ef1234567890\",\n  \"source\": \"iot-ingestion\",\n  \"data\": {\n    \"deviceId\": \"SENSOR-001\",\n    \"zoneId\": \"ROOM-101\",\n    \"metric\": \"temperature\",\n    \"value\": 29.5,\n    \"unit\": \"celsius\",\n    \"sampledAt\": \"2026-08-13T09:14:58Z\"\n  }\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Idempotent duplicate returns 200 or 201 without failure', function () {",
+                  "  pm.expect([200, 201]).to.include(pm.response.code);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "06_Local_only_NonFunctional",
+      "item": [
+        {
+          "name": "GET /api/v1/analytics/daily-summary - local response time under 1000ms",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/analytics/daily-summary?date=2026-08-13",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "analytics", "daily-summary"],
+              "query": [{ "key": "date", "value": "2026-08-13" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const env = pm.environment.get('env') || 'mock';",
+                  "if (env === 'local') {",
+                  "  pm.test('Local service responds under 1000ms SLA', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(1000);",
+                  "  });",
+                  "} else {",
+                  "  pm.test('Skipped on mock', function () { pm.expect(true).to.eql(true); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
