@@ -1,0 +1,163 @@
+openapi: 3.1.0
+info:
+  title: Smart Campus — Core Business Policy API
+  version: 1.0.0
+  description: |
+    Hợp đồng REST API cho Core Business Service (Pair 08).
+    Đánh giá các chính sách vận hành khuôn viên (sức chứa, giờ giới nghiêm, an ninh) và quản lý cảnh báo nghiệp vụ.
+  contact:
+    name: Quỳnh Đinh Trọng (Analytics Team)
+    email: dinhtrongquynh240@gmail.com
+servers:
+  - url: http://localhost:8003
+    description: Core Business Service
+  - url: http://localhost:4013
+    description: Prism Mock Server
+
+tags:
+  - name: system
+    description: Health and system diagnostics
+  - name: policy
+    description: Policy evaluation and decisions
+
+security:
+  - bearerAuth: []
+
+paths:
+  /health:
+    get:
+      tags: [system]
+      summary: Kiểm tra trạng thái Core Business Service
+      operationId: getCoreHealth
+      description: Endpoint kiểm tra liveness và readiness của Core Business.
+      security: []
+      responses:
+        "200":
+          description: Service hoạt động bình thường
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /api/v1/policies/evaluate:
+    post:
+      tags: [policy]
+      summary: Đánh giá chính sách an ninh / vận hành
+      operationId: evaluatePolicy
+      description: Nhận thông tin truy cập hoặc cảm biến để đánh giá theo quy tắc (Policy Rules) và phát sinh quyết định.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PolicyEvaluationRequest"
+      responses:
+        "200":
+          description: Kết quả đánh giá chính sách
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PolicyEvaluationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    HealthResponse:
+      type: object
+      required: [status, service, version]
+      properties:
+        status:
+          type: string
+          example: ok
+        service:
+          type: string
+          example: core-business
+        version:
+          type: string
+          example: 1.0.0
+
+    PolicyEvaluationRequest:
+      type: object
+      required: [policy_type, location, subject_id]
+      properties:
+        policy_type:
+          type: string
+          enum: [ACCESS_POLICY, CAPACITY_POLICY, CURFEW_POLICY]
+          example: "ACCESS_POLICY"
+        location:
+          type: string
+          example: "GATE-01"
+        subject_id:
+          type: string
+          example: "STU-2026-001"
+        subject_type:
+          type: string
+          example: "student"
+
+    PolicyEvaluationResponse:
+      type: object
+      required: [decision_id, decision, policy_type, location, decided_at]
+      properties:
+        decision_id:
+          type: string
+          example: "DEC-001"
+        decision:
+          type: string
+          enum: [ALLOW, DENY]
+          example: "ALLOW"
+        policy_type:
+          type: string
+          example: "ACCESS_POLICY"
+        location:
+          type: string
+          example: "GATE-01"
+        reason:
+          type: [string, "null"]
+          example: null
+        decided_at:
+          type: string
+          format: date-time
+          example: "2026-08-13T09:23:10Z"
+
+    ProblemDetails:
+      type: object
+      required: [type, title, status, detail]
+      properties:
+        type:
+          type: string
+          example: "https://smart-campus.local/problems/error"
+        title:
+          type: string
+          example: "Bad Request"
+        status:
+          type: integer
+          example: 400
+        detail:
+          type: string
+          example: "policy_type is required"
+        instance:
+          type: string
+          example: "/api/v1/policies/evaluate"
+
+  responses:
+    BadRequest:
+      description: Request không hợp lệ
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+    Unauthorized:
+      description: Thiếu hoặc sai Token xác thực
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"

@@ -1,0 +1,173 @@
+openapi: 3.1.0
+info:
+  title: Smart Campus — AI Vision API
+  version: 0.3.0
+  description: |
+    Hợp đồng REST API cho AI Vision Service (Pair 07).
+    Phát hiện đối tượng trong frame ảnh (người, phương tiện) và gửi kết quả phân tích.
+  contact:
+    name: Quỳnh Đinh Trọng (Analytics Team)
+    email: dinhtrongquynh240@gmail.com
+servers:
+  - url: http://localhost:4011
+    description: Prism mock server for AI Vision
+  - url: http://localhost:8000
+    description: Production Server
+
+tags:
+  - name: system
+    description: Health and runtime information
+  - name: vision
+    description: Image detection
+
+security:
+  - bearerAuth: []
+
+paths:
+  /health:
+    get:
+      tags: [system]
+      operationId: getVisionHealth
+      summary: Kiểm tra trạng thái AI Vision service
+      description: Endpoint kiểm tra liveness và readiness của AI Vision.
+      security: []
+      responses:
+        "200":
+          description: Service đang hoạt động
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              examples:
+                ok:
+                  value:
+                    status: ok
+                    service: ai-vision
+                    version: 0.3.0
+
+  /detect:
+    post:
+      tags: [vision]
+      operationId: detectImage
+      summary: Phát hiện đối tượng trong ảnh
+      description: Endpoint nhận diện đối tượng từ camera frame để gửi kết quả sang Analytics và Camera Stream.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DetectionRequest"
+            examples:
+              valid_url:
+                value:
+                  camera_id: CAM01
+                  image_url: https://example.com/frame.jpg
+      responses:
+        "200":
+          description: Kết quả nhận diện thành công
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DetectionResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    DetectionRequest:
+      type: object
+      required: [camera_id]
+      properties:
+        camera_id:
+          type: string
+          minLength: 3
+          example: CAM01
+        image_url:
+          type: string
+          format: uri
+          example: https://example.com/frame.jpg
+        image_base64:
+          type: string
+          description: Chuỗi base64 nếu không dùng image_url
+
+    DetectionResponse:
+      type: object
+      required: [detection_id, label, confidence, risk_level]
+      properties:
+        detection_id:
+          type: string
+          example: DET001
+        camera_id:
+          type: string
+          example: CAM01
+        label:
+          type: string
+          enum: [person, vehicle, unknown]
+          example: person
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+          example: 0.91
+        risk_level:
+          type: string
+          enum: [low, medium, high]
+          example: medium
+
+    HealthResponse:
+      type: object
+      required: [status, service, version]
+      properties:
+        status:
+          type: string
+          example: ok
+        service:
+          type: string
+          example: ai-vision
+        version:
+          type: string
+          example: 0.3.0
+
+    ProblemDetails:
+      type: object
+      required: [type, title, status, detail]
+      properties:
+        type:
+          type: string
+          example: https://smart-campus.local/problems/error
+        title:
+          type: string
+          example: Bad Request
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+          example: 400
+        detail:
+          type: string
+          example: image_url or image_base64 is required
+        instance:
+          type: string
+          example: /detect
+
+  responses:
+    BadRequest:
+      description: Dữ liệu gửi lên sai định dạng
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+    Unauthorized:
+      description: Thiếu hoặc sai token xác thực
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"

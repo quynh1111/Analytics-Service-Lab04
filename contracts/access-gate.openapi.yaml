@@ -1,0 +1,160 @@
+openapi: 3.1.0
+info:
+  title: Smart Campus — Access Gate API
+  version: 1.0.0
+  description: |
+    Hợp đồng REST API cho Access Gate Service (Pair 09).
+    Quản lý hoạt động quẹt thẻ ra/vào, xác thực quyền và ghi nhận nhật ký truy cập cho hệ thống Smart Campus.
+  contact:
+    name: Quỳnh Đinh Trọng (Analytics Team)
+    email: dinhtrongquynh240@gmail.com
+servers:
+  - url: http://localhost:8002
+    description: Access Gate Service
+  - url: http://localhost:4012
+    description: Prism Mock Server
+
+tags:
+  - name: system
+    description: Health and system diagnostics
+  - name: access
+    description: Access control and gate operations
+
+security:
+  - bearerAuth: []
+
+paths:
+  /health:
+    get:
+      tags: [system]
+      summary: Kiểm tra trạng thái Access Gate Service
+      operationId: getGateHealth
+      description: Endpoint kiểm tra liveness và readiness của Access Gate.
+      security: []
+      responses:
+        "200":
+          description: Service hoạt động bình thường
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /api/v1/gates/verify:
+    post:
+      tags: [access]
+      summary: Xác thực lượt quẹt thẻ qua cổng
+      operationId: verifyCardAccess
+      description: Kiểm tra quyền mở cổng khi sinh viên/giảng viên quẹt thẻ và phát sinh event tương ứng.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CardVerificationRequest"
+      responses:
+        "200":
+          description: Kết quả xác thực
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CardVerificationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    HealthResponse:
+      type: object
+      required: [status, service, version]
+      properties:
+        status:
+          type: string
+          example: ok
+        service:
+          type: string
+          example: access-gate
+        version:
+          type: string
+          example: 1.0.0
+
+    CardVerificationRequest:
+      type: object
+      required: [gate_id, card_id, direction]
+      properties:
+        gate_id:
+          type: string
+          example: "GATE-01"
+        card_id:
+          type: string
+          example: "CARD-998811"
+        direction:
+          type: string
+          enum: [IN, OUT]
+          example: "IN"
+
+    CardVerificationResponse:
+      type: object
+      required: [gate_id, access_granted, direction, timestamp]
+      properties:
+        gate_id:
+          type: string
+          example: "GATE-01"
+        access_granted:
+          type: boolean
+          example: true
+        direction:
+          type: string
+          enum: [IN, OUT]
+          example: "IN"
+        user_type:
+          type: string
+          example: "student"
+        deny_reason:
+          type: [string, "null"]
+          example: null
+        timestamp:
+          type: string
+          format: date-time
+          example: "2026-08-13T09:25:30Z"
+
+    ProblemDetails:
+      type: object
+      required: [type, title, status, detail]
+      properties:
+        type:
+          type: string
+          example: "https://smart-campus.local/problems/error"
+        title:
+          type: string
+          example: "Bad Request"
+        status:
+          type: integer
+          example: 400
+        detail:
+          type: string
+          example: "gate_id is required"
+        instance:
+          type: string
+          example: "/api/v1/gates/verify"
+
+  responses:
+    BadRequest:
+      description: Request không hợp lệ
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
+    Unauthorized:
+      description: Thiếu hoặc sai Token xác thực
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/ProblemDetails"
